@@ -129,6 +129,12 @@ Config.Time = {
     }
 }
 
+Config.Logging = {
+    ENABLE = false, --Do you want to enable Discord logging of time and weather changes?
+    type = 'webhook', --Choose between 'webhook', 'JD_logsV3', or 'other' for logging method. If you chose 'other', please edit the server/server.lua file to add your custom logging method.
+    location = 'CHANGE_ME', --If you chose 'webhook', enter your Discord webhook URL here. If you chose 'JD_logsV3', enter the channel name that you set for it in your Discord here (not including the emoji or the '-logs' ending of the channel name).
+}
+
 
 -- █████╗ ██╗   ██╗████████╗ ██████╗     ██████╗ ███████╗████████╗███████╗ ██████╗████████╗
 --██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗    ██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝

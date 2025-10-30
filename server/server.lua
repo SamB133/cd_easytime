@@ -138,6 +138,19 @@ end)
 
 RegisterServerEvent('cd_easytime:ForceUpdate', function(data)
     local source = source
+    local _prev = {
+        weather        = self.weather,
+        hours          = self.hours,
+        mins           = self.mins,
+        dynamic        = self.dynamic,
+        blackout       = self.blackout,
+        freeze         = self.freeze,
+        instanttime    = self.instanttime,
+        instantweather = self.instantweather,
+        tsunami        = self.tsunami,
+        weathermethod  = self.weathermethod,
+        timemethod     = self.timemethod
+    }
     if PermissionsCheck(source) then
         if data.hours then
             self.hours = data.hours
@@ -192,6 +205,61 @@ RegisterServerEvent('cd_easytime:ForceUpdate', function(data)
             TimeMethodChange(data.timemethod)
         end
         TriggerClientEvent('cd_easytime:ForceUpdate', -1, data, source)
+
+        local parts = {}
+        if _prev.weather ~= self.weather then
+            parts[#parts+1] = ("Weather → %s"):format(tostring(self.weather))
+        end
+        if (_prev.hours ~= self.hours) or (_prev.mins ~= self.mins) then
+            parts[#parts+1] = ("Time → %02d:%02d"):format(tonumber(self.hours) or 0, tonumber(self.mins) or 0)
+        end
+        if _prev.dynamic ~= self.dynamic then
+            parts[#parts+1] = ("Dynamic → %s"):format(tostring(self.dynamic))
+        end
+        if _prev.blackout ~= self.blackout then
+            parts[#parts+1] = ("Blackout → %s"):format(tostring(self.blackout))
+        end
+        if _prev.freeze ~= self.freeze then
+            parts[#parts+1] = ("Freeze Time → %s"):format(tostring(self.freeze))
+        end
+        if _prev.instanttime ~= self.instanttime then
+            parts[#parts+1] = ("Instant Time → %s"):format(tostring(self.instanttime))
+        end
+        if _prev.instantweather ~= self.instantweather then
+            parts[#parts+1] = ("Instant Weather → %s"):format(tostring(self.instantweather))
+        end
+        if _prev.weathermethod ~= self.weathermethod then
+            parts[#parts+1] = ("Weather Method → %s"):format(tostring(self.weathermethod))
+        end
+        if _prev.timemethod ~= self.timemethod then
+            parts[#parts+1] = ("Time Method → %s"):format(tostring(self.timemethod))
+        end
+        if Config.Logging.ENABLE and Config.Logging.location ~= '' and Config.Logging.location ~= nil and Config.Logging.location ~= 'CHANGE_ME' and #parts > 0 then
+            if Config.Logging.type == 'JD_logsV3' and GetResourceState('JD_logsV3') == 'started' then
+                local who = ("%s [%d]"):format(GetPlayerName(source) or "Unknown", source)
+                exports.JD_logsV3:createLog({
+                    EmbedMessage = who .. " changed EasyTime:\n- " .. table.concat(parts, "\n- "),
+                    player_id = source,
+                    channel = Config.Logging.location,
+                    screenshot = false
+                })
+            elseif Config.Logging.type == 'webhook' then
+                local discord_webhook = Config.Logging.location
+                local connect = {
+                    {
+                        ["color"] = 16711680,
+                        ["title"] = "EasyTime Change Log",
+                        ["description"] = "**"..GetPlayerName(source).."** [ID: "..source.."] changed EasyTime:\n- " .. table.concat(parts, "\n- "),
+                        ["footer"] = {
+                            ["text"] = "EasyTime Logger",
+                        },
+                    }
+                }
+                PerformHttpRequest(discord_webhook, function(err, text, headers) end, 'POST', json.encode({username = "EasyTime Logger", embeds = connect}), { ['Content-Type'] = 'application/json' })
+            elseif Config.Logging.type == 'other' then
+                -- Custom logging methods can be added here
+            end
+        end
     else
         DropPlayer(source, L('drop_player'))
     end
@@ -310,8 +378,42 @@ function TimeMethodChange(new_time_method)
 end
 
 RegisterServerEvent('cd_easytime:SetNewGameTime', function(time)
+    local prev_h, prev_m = self.hours, self.mins
     self.hours = time.hours
     self.mins = time.mins
+
+    if Config.Logging.ENABLE and Config.Logging.location ~= '' and Config.Logging.location ~= nil and Config.Logging.location ~= 'CHANGE_ME' then
+        if (prev_h ~= self.hours) or (prev_m ~= self.mins) then
+            if Config.Logging.type == 'JD_logsV3' and GetResourceState('JD_logsV3') == 'started' then
+                local who = ("%s [%d]"):format(GetPlayerName(source) or "Unknown", source)
+                exports.JD_logsV3:createLog({
+                    EmbedMessage = who .. string.format(" set Time: %02d:%02d → %02d:%02d",
+                        tonumber(prev_h) or 0, tonumber(prev_m) or 0,
+                        tonumber(self.hours) or 0, tonumber(self.mins) or 0),
+                    player_id = source,
+                    channel = Config.Logging.location,
+                    screenshot = false
+                })
+            elseif Config.Logging.type == 'webhook' then
+                local discord_webhook = Config.Logging.location
+                local connect = {
+                    {
+                        ["color"] = 16711680,
+                        ["title"] = "EasyTime Change Log",
+                        ["description"] = "**"..GetPlayerName(source).."** [ID: "..source.."] set Time: "..string.format("%02d:%02d → %02d:%02d",
+                            tonumber(prev_h) or 0, tonumber(prev_m) or 0,
+                            tonumber(self.hours) or 0, tonumber(self.mins) or 0),
+                        ["footer"] = {
+                            ["text"] = "EasyTime Logger",
+                        },
+                    }
+                }
+                PerformHttpRequest(discord_webhook, function(err, text, headers) end, 'POST', json.encode({username = "EasyTime Logger", embeds = connect}), { ['Content-Type'] = 'application/json' })
+            elseif Config.Logging.type == 'other' then
+                -- Custom logging methods can be added here
+            end
+        end
+    end
 end)
 
 CreateThread(function()
@@ -399,31 +501,70 @@ end
 
 
 RegisterServerEvent('cd_easytime:ToggleInstantChange', function(action, boolean)
+    local prev_time    = self.instanttime
+    local prev_weather = self.instantweather
     if action == 'time' then
         self.instanttime = boolean
     elseif action == 'weather' then
         self.instantweather = boolean
     end
+
+    if Config.Logging.ENABLE and Config.Logging.location ~= '' and Config.Logging.location ~= nil and Config.Logging.location ~= 'CHANGE_ME' then
+        local changed, what = false, nil
+        if action == 'time' and prev_time ~= self.instanttime then
+            changed = true; what = ("Instant Time → %s"):format(tostring(self.instanttime))
+        elseif action == 'weather' and prev_weather ~= self.instantweather then
+            changed = true; what = ("Instant Weather → %s"):format(tostring(self.instantweather))
+        end
+        if Config.Logging.type == 'JD_logsV3' and GetResourceState('JD_logsV3') == 'started' then
+            if changed then
+                local who = ("%s [%d]"):format(GetPlayerName(source) or "Unknown", source)
+                exports.JD_logsV3:createLog({
+                    EmbedMessage = who .. " toggled EasyTime:\n- " .. what,
+                    player_id = source,
+                    channel = "weather",
+                    screenshot = false
+                })
+            end
+        elseif Config.Logging.type == 'webhook' then
+            if changed then
+                local discord_webhook = Config.Logging.location
+                local connect = {
+                    {
+                        ["color"] = 16711680,
+                        ["title"] = "EasyTime Toggle Log",
+                        ["description"] = "**"..GetPlayerName(source).."** [ID: "..source.."] toggled EasyTime:\n- " .. what,
+                        ["footer"] = {
+                            ["text"] = "EasyTime Logger",
+                        },
+                    }
+                }
+                PerformHttpRequest(discord_webhook, function(err, text, headers) end, 'POST', json.encode({username = "EasyTime Logger", embeds = connect}), { ['Content-Type'] = 'application/json' })
+            end
+        elseif Config.Logging.type == 'other' then
+            -- Custom logging methods can be added here
+        end
+    end
 end)
 
-local function SaveSettngs()
+local function SaveSettings()
     SaveResourceFile(resource_name,'settings.txt', json.encode(self), -1)
     print('^3['..resource_name..'] - Settings Saved.^0')
 end
 
 RegisterServerEvent('cd_easytime:SaveSettings', function()
-    SaveSettngs()
+    SaveSettings()
 end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == resource_name then
-        SaveSettngs()
+        SaveSettings()
     end
 end)
 
 AddEventHandler('txAdmin:events:scheduledRestart', function(eventData)
     if eventData.secondsRemaining == math.ceil(Config.TsunamiWarning.time*60) then
-        SaveSettngs()
+        SaveSettings()
         if not Config.TsunamiWarning.ENABLE then return end
         self.tsunami = true
         TriggerClientEvent('cd_easytime:StartTsunamiCountdown', -1, true)
